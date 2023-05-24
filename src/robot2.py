@@ -7,7 +7,7 @@ from gprufs.msg import Velocity
 from std_msgs.msg import Int16MultiArray, Float32MultiArray
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from LidarX2 import LidarX2
+import PyLidar3
 
 #Biblioteca Raspberryi Pi
 import RPi.GPIO as gpio
@@ -39,11 +39,12 @@ image = Image()
 bridge = CvBridge()
 
 #LidarX2
-lidarx2 = LidarX2("/dev/ttyUSB0")  # Name of the serial port, can be /dev/tty*, COM*, etc.
+lidarx4 = PyLidar3.YdLidarX4("/dev/ttyUSB0")
 lidar_msg = Float32MultiArray()
-if not lidarx2.open():
-    print("Cannot open lidarX2")
+if(not lidarx4.Connect()):
+    print("Cannot open lidarX4")
     exit(1)
+lidarx4_read = lidarx4.StartScanning()
 
 #Pinagem
 gpio.setmode(gpio.BCM) #se você quer se referir aos pinos da mesma forma que o fabricante
@@ -52,12 +53,13 @@ gpio.setmode(gpio.BCM) #se você quer se referir aos pinos da mesma forma que o 
 rp.init_node('robot', anonymous= False)
 # anynomous: mata outro node com nome igual na inicializacao
 # caso contrario, adiciona um numero na frente do novo node
-
+          
 def convert_to_scalar(measures):
+
     angles = []
     distances = []
-    for measure in measures:
-        angle,distance = measure.get_pair()
+    for angle in measures:
+        distance = measures[angle]
         angles.append(angle*(np.pi/180))
         distances.append(distance)
     return angles + distances
@@ -93,7 +95,7 @@ def callBack_cmd_vel(msg):
     #global cont,vel,modelo_cinematico_inverso, Linear_maximo, Angular_maximo
     global vel,image
 
-    pub_lidarx2.publish(lidar_msg)
+    pub_lidarx4.publish(lidar_msg)
     pub_vel.publish(vel)  
     pub_camera.publish(image)
     
@@ -101,7 +103,7 @@ def callBack_cmd_vel(msg):
     
 sub = rp.Subscriber('/robot/cmd_vel', Twist, callBack_cmd_vel)
 pub_vel = rp.Publisher('/robot/encoder',Int16MultiArray,queue_size=1)
-pub_lidarx2 = rp.Publisher('/robot/lidar',Float32MultiArray,queue_size=1)
+pub_lidarx4 = rp.Publisher('/robot/lidar',Float32MultiArray,queue_size=1)
 pub_camera = rp.Publisher('/robot/camera',Image,queue_size=1)
 
 
@@ -120,9 +122,11 @@ while(not rp.is_shutdown()):
         image = bridge.cv2_to_imgmsg(frame_gray,'mono8')
         
     # Get latest lidar measures
-    measures = lidarx2.getMeasures()  
+    measures = next(lidarx4_read)
     if(len(measures) > 0): 
         lidar_msg.data = convert_to_scalar(measures)
 
+lidarx4.StopScanning()
+lidarx4.Disconnect()
 # evita a finalizacao do script enquanto espera pelas mensagens
 rp.spin()
