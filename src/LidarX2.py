@@ -26,6 +26,7 @@ class LidarX2:
         self.stopThread = False
         self.measureList = []
         self.serial = None
+        self.newData = False
 
     def open(self):
         try:
@@ -60,7 +61,11 @@ class LidarX2:
             self.connected = False
 
     def getMeasures(self):
+        self.newData = False
         return list(self.measureList)
+
+    def newDataAvailable(self):
+        return self.newData
 
     def __measureThread(self):
         startAngle = 0
@@ -180,5 +185,6 @@ class LidarX2:
         checksum ^= lsa
         # Validate checksum
         if checksum == cs:
+            self.newData = True
             return result
         return []

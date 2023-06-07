@@ -39,7 +39,7 @@ image = Image()
 bridge = CvBridge()
 
 #LidarX2
-lidarx4 = PyLidar3.YdLidarX4("/dev/ttyUSB0")
+lidarx4 = PyLidar3.YdLidarX4("/dev/ttyUSB0",2000)
 lidar_msg = Float32MultiArray()
 if(not lidarx4.Connect()):
     print("Cannot open lidarX4")

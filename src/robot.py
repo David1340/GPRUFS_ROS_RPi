@@ -26,10 +26,6 @@ modelo_cinematico_inverso = np.linalg.inv(modelo_cinematico)
 Linear_maximo = 5.3
 Angular_maximo = 0.9422
 
-#Comunicação USB com o stm32
-stm32 = serial.Serial(port = '/dev/ttyACM0',baudrate=115200)
-vel = Int16MultiArray()
-
 #camera
 camera = cv2.VideoCapture(0)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH,640)
@@ -44,6 +40,10 @@ lidar_msg = Float32MultiArray()
 if not lidarx2.open():
     print("Cannot open lidarX2")
     exit(1)
+
+#Comunicação USB com o stm32
+stm32 = serial.Serial(port = '/dev/ttyACM0',baudrate=115200)
+vel = Int16MultiArray()
 
 #Pinagem
 gpio.setmode(gpio.BCM) #se você quer se referir aos pinos da mesma forma que o fabricante
@@ -63,7 +63,7 @@ def convert_to_scalar(measures):
     return angles + distances
 
 def enviar_velocidade(msg):
-    global  modelo_cinematico_inverso, Linear_maximo, Angular_maximo
+    global  modelo_cinematico_inverso, Linear_maximo, Angular_maximo, stm32
     V = np.array([[msg.linear.x,msg.angular.z]]).T #[v;W]
 
     FI = modelo_cinematico_inverso @ V #[fi_d;fi_e]
@@ -91,7 +91,7 @@ def enviar_velocidade(msg):
 def callBack_cmd_vel(msg):
     #global motor_direito, motor_esquerdo, sentido_direito, sentido_esquerdo,  modelo_cinematico_inverso, Linear_maximo, Angular_maximo
     #global cont,vel,modelo_cinematico_inverso, Linear_maximo, Angular_maximo
-    global vel,image
+    global vel,image,lidar_msg
 
     pub_lidarx2.publish(lidar_msg)
     pub_vel.publish(vel)  
@@ -107,15 +107,14 @@ pub_camera = rp.Publisher('/robot/camera',Image,queue_size=1)
 
 while(not rp.is_shutdown()):
     #leitura dos encoders
-    if(stm32.inWaiting() >0):
-        
+    if(stm32.inWaiting() > 1):
         msg_read = stm32.readline(3).decode().split()
         vel.data = [int(msg_read[0]),int(msg_read[1]),7,71]
 
     #leitura da câmera
     ret, frame = camera.read()
     if(ret):
-        #image = bridge.cv2_to_imgmsg(frame,'bgr8')
+        image = bridge.cv2_to_imgmsg(frame,'bgr8')
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         image = bridge.cv2_to_imgmsg(frame_gray,'mono8')
         
