@@ -106,27 +106,29 @@ pub_vel = rp.Publisher('/robot/encoder',Int16MultiArray,queue_size=1)
 pub_lidarx4 = rp.Publisher('/robot/lidar',Float32MultiArray,queue_size=1)
 pub_camera = rp.Publisher('/robot/camera',Image,queue_size=1)
 
+try:
+    while(not rp.is_shutdown()):
+        #leitura dos encoders
+        if(stm32.inWaiting() >1):     
+            msg_read = stm32.readline(3).decode().split()
+            vel.data = [int(aux) for aux in msg_read]
 
-while(not rp.is_shutdown()):
-    #leitura dos encoders
-    if(stm32.inWaiting() >0):
-        
-        msg_read = stm32.readline(3).decode().split()
-        vel.data = [int(msg_read[0]),int(msg_read[1]),7,71]
+        #leitura da câmera
+        ret, frame = camera.read()
+        if(ret):
+            #image = bridge.cv2_to_imgmsg(frame,'bgr8')
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+            image = bridge.cv2_to_imgmsg(frame_gray,'mono8')
+            
+        # Get latest lidar measures
+        measures = next(lidarx4_read)
+        if(len(measures) > 0): 
+            lidar_msg.data = convert_to_scalar(measures)
 
-    #leitura da câmera
-    ret, frame = camera.read()
-    if(ret):
-        #image = bridge.cv2_to_imgmsg(frame,'bgr8')
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        image = bridge.cv2_to_imgmsg(frame_gray,'mono8')
-        
-    # Get latest lidar measures
-    measures = next(lidarx4_read)
-    if(len(measures) > 0): 
-        lidar_msg.data = convert_to_scalar(measures)
+except KeyboardInterrupt:
+    stm32.close()
+    lidarx4.StopScanning()
+    lidarx4.Disconnect()
 
-lidarx4.StopScanning()
-lidarx4.Disconnect()
 # evita a finalizacao do script enquanto espera pelas mensagens
-rp.spin()
+#rp.spin()
