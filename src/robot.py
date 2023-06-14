@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 
-#Bibliotecas ros
+#Bibliotecas do ros
 import rospy as rp
 from geometry_msgs.msg import Twist
-from gprufs.msg import Velocity
 from std_msgs.msg import Int16MultiArray, Float32MultiArray
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from LidarX2 import LidarX2
 
-#Biblioteca Raspberryi Pi
-import RPi.GPIO as gpio
 
 #Outras bibliotecas
+from LidarX2 import LidarX2
 import numpy as np
 import time
 import serial 
@@ -45,9 +42,6 @@ if not lidarx2.open():
 stm32 = serial.Serial(port = '/dev/ttyACM0',baudrate=115200)
 vel = Int16MultiArray()
 
-#Pinagem
-gpio.setmode(gpio.BCM) #se você quer se referir aos pinos da mesma forma que o fabricante
-
 #Inicia o nó robot 
 rp.init_node('robot', anonymous= False)
 # anynomous: mata outro node com nome igual na inicializacao
@@ -64,15 +58,16 @@ def convert_to_scalar(measures):
 
 def enviar_velocidade(msg):
     global  modelo_cinematico_inverso, Linear_maximo, Angular_maximo, stm32
+
     V = np.array([[msg.linear.x,msg.angular.z]]).T #[v;W]
-
-    FI = modelo_cinematico_inverso @ V #[fi_d;fi_e]
-
+ 
     if(np.abs(V[0]) > np.abs(Linear_maximo)):
         V[0] = Linear_maximo * V[0]/np.abs(V[0])
 
     if(np.abs(V[1]) > np.abs(Angular_maximo)):
         V[1] = Angular_maximo * V[1]/np.abs(V[1])
+
+    FI = modelo_cinematico_inverso @ V #[fi_d;fi_e]
 
     msg2 = [255,0,0]
     if(FI[0] >= 0):  
@@ -89,8 +84,6 @@ def enviar_velocidade(msg):
 
 #funções de callBack
 def callBack_cmd_vel(msg):
-    #global motor_direito, motor_esquerdo, sentido_direito, sentido_esquerdo,  modelo_cinematico_inverso, Linear_maximo, Angular_maximo
-    #global cont,vel,modelo_cinematico_inverso, Linear_maximo, Angular_maximo
     global vel,image,lidar_msg
 
     pub_lidarx2.publish(lidar_msg)
